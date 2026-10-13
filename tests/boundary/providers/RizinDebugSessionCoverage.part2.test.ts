@@ -18,8 +18,14 @@ afterEach(cleanup);
 it.skipIf(process.platform === "win32")(
   "stops the session when the provider closes its stdin pipe",
   async () => {
+    // The provider must close its stdin before publishing its readiness frame.
+    // Closing afterwards leaves the command write racing the close: a write
+    // that lands in the pipe buffer first succeeds silently, and the command
+    // is then reported through the documented timeout result (partial output,
+    // unknown completion) instead of the closed-transport failure this test
+    // establishes.
     const provider = await makeProvider(
-      'printf "\\000"; exec 0<&-; while :; do :; done',
+      'exec 0<&-; printf "\\000"; sleep 0.3; while :; do :; done',
       "#!/bin/sh",
     );
     const { manager, sessionId } = await start(provider, {
